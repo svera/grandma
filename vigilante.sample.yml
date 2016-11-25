@@ -1,0 +1,5 @@
+# Slack API token
+slack_token: "SLACK TOKEN"
+github_token: "GITHUB TOKEN"
+maximum: 10
+channel: "SLACK CHANNEL NAME"
