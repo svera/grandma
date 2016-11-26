@@ -12,9 +12,10 @@ import (
 )
 
 var cfg *config.Config
+var githubClient *github.Client
+var slackClient *slack.Client
 
 func main() {
-	var cfg *config.Config
 	var err error
 
 	if cfg, err = loadConfig(); err != nil {
@@ -26,12 +27,17 @@ func main() {
 		&oauth2.Token{AccessToken: cfg.GithubToken},
 	)
 	tc := oauth2.NewClient(oauth2.NoContext, ts)
-	githubClient := github.NewClient(tc)
+	githubClient = github.NewClient(tc)
 
-	//slackClient := slack.New(cfg.SlackToken)
+	slackClient := slack.New(cfg.SlackToken)
 
-	if amount := calculateTotal(githubClient); amount > cfg.Maximum {
-		//notify(amount, slackClient)
+	if amount, err := calculateTotal(githubClient); err == nil {
+		if amount > cfg.Maximum {
+			notify(amount, slackClient)
+		}
+	} else {
+		fmt.Println(err)
+		return
 	}
 }
 
@@ -44,36 +50,36 @@ func loadConfig() (*config.Config, error) {
 	return config.Parse(data)
 }
 
-func calculateTotal(githubClient *github.Client) int {
+// Note that Github API only return a maximum of 100 results per request, no matter
+// what you put in the PerPage property
+func calculateTotal(githubClient *github.Client) (int, error) {
 	repoListOptions := &github.RepositoryListByOrgOptions{
 		Type:        "private",
-		ListOptions: github.ListOptions{PerPage: 999},
+		ListOptions: github.ListOptions{PerPage: 100},
 	}
 
-	// get all pages of results
 	var amount int
 	for {
-		repos, resp, err := githubClient.Repositories.ListByOrg("magento-mcom", repoListOptions)
+		repos, resp, err := githubClient.Repositories.ListByOrg(cfg.Organization, repoListOptions)
 		if err != nil {
-			fmt.Errorf("Error retrieving repositories")
+			return 0, fmt.Errorf("Error retrieving repositories")
 		}
 		for n := range pulls(githubClient, repos) {
-			amount += n // 16 then 81
+			amount += n
 		}
 		if resp.NextPage == 0 {
 			break
 		}
 		repoListOptions.ListOptions.Page = resp.NextPage
 	}
-	fmt.Printf("%d\n", amount)
-	return amount
+	return amount, nil
 }
 
 func pulls(githubClient *github.Client, repos []*github.Repository) <-chan int {
 	var wg sync.WaitGroup
 
 	pullListOptions := &github.PullRequestListOptions{
-		ListOptions: github.ListOptions{PerPage: 999},
+		ListOptions: github.ListOptions{PerPage: 100},
 	}
 	out := make(chan int)
 	wg.Add(len(repos))
