@@ -12,10 +12,11 @@ import (
 
 // Config holds data needed to run vigilante
 type Config struct {
-	SlackToken  string `yaml:"slack_token"`
-	GithubToken string `yaml:"github_token"`
-	Maximum     int    `yaml:"maximum"`
-	Channel     string `yaml:"channel"`
+	SlackToken   string `yaml:"slack_token"`
+	GithubToken  string `yaml:"github_token"`
+	Maximum      int    `yaml:"maximum"`
+	Channel      string `yaml:"channel"`
+	Organization string `yaml:"organization"`
 }
 
 // Load reads configuration from the passed file name
@@ -52,7 +53,11 @@ func (c *Config) validate() error {
 	}
 
 	if c.Channel == "" {
-		return errors.New("No channel defined for sending communications")
+		return errors.New("No channel defined for sending communications.")
+	}
+
+	if c.Organization == "" {
+		return errors.New("No organization to watch.")
 	}
 
 	return nil
