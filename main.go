@@ -13,7 +13,6 @@ import (
 var cfg *config.Config
 
 func main() {
-	var cfg *config.Config
 	var err error
 
 	if cfg, err = loadConfig(); err != nil {
