@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/go-github/github"
 	"github.com/nlopes/slack"
-	"github.com/svera/vigilante/config"
+	"github.com/svera/grandma/config"
 	"golang.org/x/oauth2"
 )
 
@@ -85,7 +85,7 @@ func pulls(githubClient *github.Client, repos []*github.Repository) <-chan int {
 	wg.Add(len(repos))
 	for _, repo := range repos {
 		go func(repo *github.Repository) {
-			if pulls, _, err := githubClient.PullRequests.List("magento-mcom", *repo.Name, pullListOptions); err != nil {
+			if pulls, _, err := githubClient.PullRequests.List(cfg.Organization, *repo.Name, pullListOptions); err != nil {
 				log.Println(fmt.Errorf("Error retrieving pull request info"))
 			} else {
 				out <- len(pulls)
