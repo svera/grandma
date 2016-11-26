@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/google/go-github/github"
 	"github.com/nlopes/slack"
@@ -27,10 +28,10 @@ func main() {
 	tc := oauth2.NewClient(oauth2.NoContext, ts)
 	githubClient := github.NewClient(tc)
 
-	slackClient := slack.New(cfg.SlackToken)
+	//slackClient := slack.New(cfg.SlackToken)
 
 	if amount := calculateTotal(githubClient); amount > cfg.Maximum {
-		notify(amount, slackClient)
+		//notify(amount, slackClient)
 	}
 }
 
@@ -48,9 +49,6 @@ func calculateTotal(githubClient *github.Client) int {
 		Type:        "private",
 		ListOptions: github.ListOptions{PerPage: 999},
 	}
-	pullListOptions := &github.PullRequestListOptions{
-		ListOptions: github.ListOptions{PerPage: 999},
-	}
 
 	// get all pages of results
 	var amount int
@@ -59,19 +57,41 @@ func calculateTotal(githubClient *github.Client) int {
 		if err != nil {
 			fmt.Errorf("Error retrieving repositories")
 		}
-		for _, repoData := range repos {
-			if pulls, _, err := githubClient.PullRequests.List("magento-mcom", *repoData.Name, pullListOptions); err != nil {
-				log.Println(fmt.Errorf("Error retrieving pull request info"))
-			} else {
-				amount += len(pulls)
-			}
+		for n := range pulls(githubClient, repos) {
+			amount += n // 16 then 81
 		}
 		if resp.NextPage == 0 {
 			break
 		}
 		repoListOptions.ListOptions.Page = resp.NextPage
 	}
+	fmt.Printf("%d\n", amount)
 	return amount
+}
+
+func pulls(githubClient *github.Client, repos []*github.Repository) <-chan int {
+	var wg sync.WaitGroup
+
+	pullListOptions := &github.PullRequestListOptions{
+		ListOptions: github.ListOptions{PerPage: 999},
+	}
+	out := make(chan int)
+	wg.Add(len(repos))
+	for _, repo := range repos {
+		go func(repo *github.Repository) {
+			if pulls, _, err := githubClient.PullRequests.List("magento-mcom", *repo.Name, pullListOptions); err != nil {
+				log.Println(fmt.Errorf("Error retrieving pull request info"))
+			} else {
+				out <- len(pulls)
+			}
+			wg.Done()
+		}(repo)
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
 
 func notify(number int, slackClient *slack.Client) error {
