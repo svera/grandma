@@ -33,18 +33,19 @@ func main() {
 
 	if amount, err := calculateTotal(githubClient); err == nil {
 		if amount > cfg.Maximum {
-			notify(amount, slackClient)
+			if err := notify(amount, slackClient); err != nil {
+				fmt.Printf("Slack error: %s\n", err)
+			}
 		}
 	} else {
 		fmt.Println(err)
-		return
 	}
 }
 
 func loadConfig() (*config.Config, error) {
 	var data []byte
 	var err error
-	if data, err = config.Load("/etc/vigilante.yml"); err != nil {
+	if data, err = config.Load("/etc/grandma.yml"); err != nil {
 		return nil, err
 	}
 	return config.Parse(data)
@@ -54,13 +55,14 @@ func loadConfig() (*config.Config, error) {
 // what you put in the PerPage property
 func calculateTotal(githubClient *github.Client) (int, error) {
 	repoListOptions := &github.RepositoryListByOrgOptions{
-		Type:        "private",
+		Type:        "all",
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
 
-	var amount int
+	var amount, numberRepos int
 	for {
 		repos, resp, err := githubClient.Repositories.ListByOrg(cfg.Organization, repoListOptions)
+		numberRepos += len(repos)
 		if err != nil {
 			return 0, fmt.Errorf("Error retrieving repositories")
 		}
@@ -68,6 +70,7 @@ func calculateTotal(githubClient *github.Client) (int, error) {
 			amount += n
 		}
 		if resp.NextPage == 0 {
+			fmt.Printf("%s has %d repositories, %d open pull requests found.\n", cfg.Organization, numberRepos, amount)
 			break
 		}
 		repoListOptions.ListOptions.Page = resp.NextPage
