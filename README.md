@@ -11,4 +11,4 @@ open pull requests exceeds the amount you specify.
 
 ## Configuration
 
-Configuration is read from `etc/grandma.yml`. Take a look at `grandma.sample.yml` for guidance.
+Configuration is read from `/etc/grandma.yml`. Take a look at `grandma.sample.yml` for guidance.
